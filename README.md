@@ -1,2 +1,2 @@
-# microscopiko
+# MICROSCOPIKO
 Для обучения
