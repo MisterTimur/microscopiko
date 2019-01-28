@@ -26,7 +26,7 @@ irq_redirect:
         db      PIC2_DATA,    0x02
         db      PIC1_DATA,    ICW4_8086
         db      PIC2_DATA,    ICW4_8086
-        db      PIC1_DATA,    0xFF ; xor (IRQ_TIMER)
+        db      PIC1_DATA,    0xFF xor (IRQ_TIMER)
         db      PIC2_DATA,    0xFF
 
 ; Инициализация IVT
@@ -34,14 +34,22 @@ irq_redirect:
 
 ivt_init:
 
+        ; Очистка IVT
         mov     eax, .null
         xor     edi, edi
         mov     ecx, 256
 @@:     call    .make
         loop    @b
 
-        ; ...
-
+        ; Установка обработчиков IRQ
+        mov     cx, 1
+        mov     esi, .irq
+@@:     movzx   edi, byte [esi]
+        inc     esi
+        lodsd
+        shl     edi, 3
+        call    .make
+        loop    @b
         ret
 
 .make:  ; eax - адрес прерывания, edi - адрес ivt
@@ -51,8 +59,22 @@ ivt_init:
         add     edi, 8
         ret
 
+.irq:   IRQitem $20, irq.timer
+
 ; Ошибка вызова несуществующего прерывания. Ничегошеньки не делать.
 .null:  iretd
+
+; Важные системные прерывания
+; ----------------------------------------------------------------------
+
+irq:
+
+.timer: pusha
+        inc     [irq_timer]
+        mov     al, $20
+        out     $20, al
+        popa
+        iretd
 
 ; Инициализация главной TSS
 ; ----------------------------------------------------------------------
@@ -69,6 +91,9 @@ tss_init:
 
 dev_init:
 
+        mov     [irq_timer], 0
+
+        ; Часы на 100 мгц
         mov     al, $34
         out     $43, al
         mov     al, $9b

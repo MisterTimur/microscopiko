@@ -40,14 +40,14 @@ pm:     mov     ax, $0008
         mov     es, ax
         mov     ss, ax
         mov     esp, $7c00
+        call    irq_redirect        ; Средиректить IRQ
+        call    ivt_init            ; Инициализировать IVT
+        call    tss_init            ; Запустить TSS
+        call    dev_init            ; Устройства
 
-        call    irq_redirect
-        call    ivt_init
-        call    tss_init
-        call    dev_init
+        sti
 
         jmp     $
-
 
         ; Включение страниц
         ; Обращения к FDC
