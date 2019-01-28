@@ -1,0 +1,4 @@
+ПРЕРЫВАНИЯ
+
+# Установка нового вектора прерываний в новый процесс
+void    irq.set(byte vector_id, word process_id, void* address)
