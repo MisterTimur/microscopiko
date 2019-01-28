@@ -1,8 +1,8 @@
 
         org     8000h
-        
-        include "macro.asm"        
-        include "define.asm"        
+
+        include "macro.asm"
+        include "define.asm"
 
 ; Вход в защищенный режим
 ; ----------------------------------------------------------------------
@@ -19,7 +19,7 @@
         jmp     10h : pm            ; Переход в PM
 
 ; ----------------------------------------------------------------------
-GDTR:   dw 3*8 - 1                  ; Лимит GDT (размер - 1)
+GDTR:   dw 4*8 - 1                  ; Лимит GDT (размер - 1)
         dq GDT                      ; Линейный адрес GDT
 IDTR:   dw 256*8 - 1                ; Лимит GDT (размер - 1)
         dq 0                        ; Линейный адрес GDT
@@ -27,41 +27,31 @@ IDTR:   dw 256*8 - 1                ; Лимит GDT (размер - 1)
 GDT:    dw 0,      0,    0,     0   ; 00 NULL-дескриптор
         dw 0FFFFh, 0, 9200h, 00CFh  ; 08 32-битный дескриптор данных
         dw 0FFFFh, 0, 9A00h, 00CFh  ; 10 32-bit код
+        dw 103,  TSS, 8900h, 0040h  ; 18 Свободный TSS
 ; ----------------------------------------------------------------------
 
         use32
 
         include "core/core.asm"
 
-        ; Установка сегментов
-pm:     mov     ax, 8
+        ; Установка сегментов данных
+pm:     mov     ax, $0008
         mov     ds, ax
         mov     es, ax
         mov     ss, ax
-        mov     fs, ax
-        mov     gs, ax
+        mov     esp, $7c00
 
-        ; Включить SSE
-        mov     eax, cr0
-        and     ax,  0xFFFB             ; clear coprocessor emulation CR0.EM
-        or      ax,  0x2                ; set coprocessor monitoring  CR0.MP
-        mov     cr0, eax
-        mov     eax, cr4
-        or      ax,  3 shl 9            ; set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
-        mov     cr4, eax
-brk
-        ; Переброска IRQ
         call    irq_redirect
         call    ivt_init
-        
+        call    tss_init
+        call    dev_init
+
         jmp     $
-        
-        
-        ; Назначение IVT
-        ; Назначение TASK
+
+
         ; Включение страниц
         ; Обращения к FDC
-        
+
         ; Загрузка задачи в память
         ; Мультизадачное выполнение
 
