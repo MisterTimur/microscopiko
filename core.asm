@@ -32,7 +32,7 @@ irq_init:
         db      PIC2_DATA,    0x02
         db      PIC1_DATA,    ICW4_8086
         db      PIC2_DATA,    ICW4_8086
-        db      PIC1_DATA,    0xFF xor (IRQ_TIMER or IRQ_KEYB)
+        db      PIC1_DATA,    0xFF xor (IRQ_TIMER or IRQ_KEYB or IRQ_FDC)
         db      PIC2_DATA,    0xFF
 
 ; Инициализация IVT
@@ -92,7 +92,7 @@ ivt_init:
 .irq_3: dd irq.nil
 .irq_4: dd irq.nil
 .irq_5: dd irq.nil
-.irq_6: dd irq.nil
+.irq_6: dd fdc_irq
 .irq_7: dd irq.nil
 .irq_8: dd irq.nil
 .irq_9: dd irq.nil
@@ -153,7 +153,7 @@ mem_init:
 
         ; Размер памяти
         mov     ecx, 32             ; Бинарный поиск на 2^32
-        mov     esi, LOW_MEMORY 
+        mov     esi, LOW_MEMORY
         mov     edi, $bfffffff      ; $c0000000 hardware
 .rept:  mov     ebx, esi            ; ebx = (esi + edi) >> 1
         add     ebx, edi
@@ -176,7 +176,7 @@ mem_init:
         xor     eax, eax
         rep     stosd
         pop     ecx edi
-        mov     eax, LOW_MEMORY + $1003        ; Каталоги c правами R/W=1, P=1
+        mov     eax, LOW_MEMORY + $1003 ; Каталоги c правами R/W=1, P=1
 @@:     stosd
         add     eax, $1000
         loop    @b
@@ -202,12 +202,6 @@ mem_init:
         bts     eax, 31
         mov     cr0, eax
 
-        ; Принудительный сброс TLB
-        mov     ecx, [mem_size]
-@@:     invlpg  [ecx - 1024]
-        sub     ecx, 4096
-        jnb     @b
-
         ; Локальная память для задач ядра
         mov     [dynamic], edi
         mov     [appsmem], START_MEM
@@ -218,4 +212,26 @@ mem_init:
 
 gdt_init:
 
+        mov     esi, GDT
+        mov     edi, [dynamic]
+        add     [dynamic], dword $10000     ; Выделить 64 кб
+        push    edi edi
+        xor     eax, eax
+        mov     ecx, $4000
+        rep     stosd
+        pop     edi
+        mov     cx, 4*2
+        rep     movsd
+        pop     edi
+
+        ; Новый GDT. Сохранить размер
+        mov     [GDTR + 2], edi
+        lgdt    [GDTR]
+
+        ; Перезагрузка сегментов
+        mov     ax, $0008
+        mov     ds, ax
+        mov     es, ax
+        mov     ss, ax
         ret
+

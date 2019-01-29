@@ -32,6 +32,8 @@ GDT:    dw 0,      0,    0,     0   ; 00 NULL-дескриптор
         use32
 
         include "core.asm"
+        include "device/fdc.asm"
+        include "device/ata.asm"
 
         ; Установка сегментов данных
 pm:     mov     ax, $0008
@@ -44,11 +46,16 @@ pm:     mov     ax, $0008
         call    ivt_init            ; Инициализировать IVT
         call    tss_init            ; Запустить TSS
         call    dev_init            ; Устройства
-        call    gdt_init            ; Новое место GDT
         call    mem_init            ; Страничная память
+        call    gdt_init            ; Новое место GDT
+        call    fdc_init            ; Создать кеш fd-диска
         mov     esp, HI_STACK       ; Новый стек
 
         mov     [$b8000], word $1F50
+
+        sti
+        mov     ax, 0
+        call    fdc_read
 
         jmp     $
 

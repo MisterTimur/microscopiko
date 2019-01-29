@@ -63,5 +63,11 @@ macro IRQ_handler slave {
     popa
     add     esp, 4
     iretd
+}
 
+; Чтение регистра в память
+macro FDCREAD m {
+
+    call    fdc_read_reg
+    mov     [m], al
 }
