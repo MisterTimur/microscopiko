@@ -70,32 +70,32 @@ ivt_init:
         IRQ_master .irq_5
         IRQ_master .irq_6
         IRQ_master .irq_7
-        IRQ_master .irq_8
-        IRQ_master .irq_9
-        IRQ_master .irq_A
-        IRQ_master .irq_B
-        IRQ_master .irq_C
-        IRQ_master .irq_D
-        IRQ_master .irq_E
-        IRQ_master .irq_F
+        IRQ_slave  .irq_8
+        IRQ_slave  .irq_9
+        IRQ_slave  .irq_A
+        IRQ_slave  .irq_B
+        IRQ_slave  .irq_C
+        IRQ_slave  .irq_D
+        IRQ_slave  .irq_E
+        IRQ_slave  .irq_F
 
 ; Ссылки на обработчики IRQ
 .irq_0: dd irq.timer
 .irq_1: dd irq.keyb
-.irq_2: dd irq.master
-.irq_3: dd irq.master
-.irq_4: dd irq.master
-.irq_5: dd irq.master
-.irq_6: dd irq.master
-.irq_7: dd irq.master
-.irq_8: dd irq.slave
-.irq_9: dd irq.slave
-.irq_A: dd irq.slave
-.irq_B: dd irq.slave
-.irq_C: dd irq.slave
-.irq_D: dd irq.slave
-.irq_E: dd irq.slave
-.irq_F: dd irq.slave
+.irq_2: dd irq.nil
+.irq_3: dd irq.nil
+.irq_4: dd irq.nil
+.irq_5: dd irq.nil
+.irq_6: dd irq.nil
+.irq_7: dd irq.nil
+.irq_8: dd irq.nil
+.irq_9: dd irq.nil
+.irq_A: dd irq.nil
+.irq_B: dd irq.nil
+.irq_C: dd irq.nil
+.irq_D: dd irq.nil
+.irq_E: dd irq.nil
+.irq_F: dd irq.nil
 
 ; ----------------------------------------------------------------------
 irq:
@@ -107,6 +107,8 @@ irq:
 .keyb:  
         in      al, $60
         ret
+
+.nil:   ret        
 
 ; Два типа общих обработчиков
 .master: IRQ_handler 0
