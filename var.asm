@@ -40,3 +40,27 @@ TSS:
 .gs     dd ?   
 .ldtr   dd ?
 .iobp   dw ?, ?
+
+
+fdc:
+
+; результат
+.st0            db ?        ; Статусный регистр 0
+.st1            db ?
+.st2            db ?
+.cyl            db ?
+.head_end       db ?
+.head_start     db ?
+
+; функционирование
+.motor          db ?        ; Включен ли мотор
+.motor_time     dd ?        ; Время включения мотора
+.func           db ?        ; Функция запроса на IRQ
+.ready          db ?        ; IRQ обработан
+.error          db ?        ; Ошибка исполнения
+
+; запрос
+.r_hd           db ?        ; * головка
+.r_cyl          db ?        ; * цилиндр
+.r_sec          db ?        ; * сектор
+

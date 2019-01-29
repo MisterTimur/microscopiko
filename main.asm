@@ -51,12 +51,12 @@ pm:     mov     ax, $0008
         call    fdc_init            ; Создать кеш fd-диска
         mov     esp, HI_STACK       ; Новый стек
 
-        mov     [$b8000], word $1F50
+        mov     [$b8000], word $1F33
 
         sti
-
-        mov     ax, 0
-        call    fdc_read
+        
+        ;mov     ax, 19
+        ;call    fdc_read
 
         jmp     $
 

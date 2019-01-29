@@ -108,7 +108,20 @@ irq:
 
 .timer:
         inc     [irq_timer]
-        ret
+
+        ; Мотор включен? 
+        cmp     [fdc.motor], 0
+        je      .ex1
+
+        ; Если > 5с крутится, выключить
+        mov     eax, [irq_timer]
+        sub     eax, [fdc.motor_time]
+        cmp     eax, 500
+        jb      .ex1
+        call    fdc_motor_off        
+.ex1:   ret
+
+; ----------------------------------------------------------------------
 
 .keyb:
         in      al, $60
@@ -234,4 +247,3 @@ gdt_init:
         mov     es, ax
         mov     ss, ax
         ret
-

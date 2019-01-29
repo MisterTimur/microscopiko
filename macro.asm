@@ -36,8 +36,54 @@ IRQ_FDC          equ 0x40
 IRQ_PS2MOUSE     equ 0x10
 
 ; ----------------------------------------------------------------------
+; FDC
+; ----------------------------------------------------------------------
 
-macro brk { xchg bx, bx }
+; Порты
+STATUS_REGISTER_A                equ 0x3F0  ; read-only
+STATUS_REGISTER_B                equ 0x3F1  ; read-only
+DIGITAL_OUTPUT_REGISTER          equ 0x3F2
+TAPE_DRIVE_REGISTER              equ 0x3F3
+MAIN_STATUS_REGISTER             equ 0x3F4  ; read-only
+DATARATE_SELECT_REGISTER         equ 0x3F4  ; write-only
+DATA_FIFO                        equ 0x3F5
+DIGITAL_INPUT_REGISTER           equ 0x3F7  ; read-only
+CONFIGURATION_CONTROL_REGISTER   equ 0x3F7  ; write-only
+
+; Команды
+READ_TRACK                      equ 2  ; generates IRQ6
+SPECIFY                         equ 3  ; * set drive parameters
+SENSE_DRIVE_STATUS              equ 4
+WRITE_DATA                      equ 5  ; * write to the disk
+READ_DATA                       equ 6  ; * read from the disk
+RECALIBRATE                     equ 7  ; * seek to cylinder 0
+SENSE_INTERRUPT                 equ 8  ; * ack IRQ6, get status of last command
+WRITE_DELETED_DATA              equ 9
+READ_ID                         equ 10 ; generates IRQ6
+READ_DELETED_DATA               equ 12
+FORMAT_TRACK                    equ 13
+DUMPREG                         equ 14
+SEEK                            equ 15 ; * seek both heads to cylinder X
+VERSION                         equ 16 ; * used during initialization, once
+SCAN_EQUAL                      equ 17
+PERPENDICULAR_MODE              equ 18 ; * used during initialization, once, maybe
+CONFIGURE                       equ 19 ; * set controller parameters
+LOCK                            equ 20 ; * protect controller params from a reset
+VERIFY                          equ 22
+SCAN_LOW_OR_EQUAL               equ 25
+SCAN_HIGH_OR_EQUAL              equ 29
+
+; Статусы
+FDC_STATUS_NONE                 equ 0x0
+FDC_STATUS_SEEK                 equ 0x1
+FDC_STATUS_RW                   equ 0x2
+FDC_STATUS_SENSEI               equ 0x3
+
+; ----------------------------------------------------------------------
+
+macro brk {
+    xchg bx, bx
+}
 
 macro IRQ_master a {
     push    dword [a]

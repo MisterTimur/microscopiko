@@ -1,66 +1,4 @@
 
-; Порты
-STATUS_REGISTER_A                equ 0x3F0  ; read-only
-STATUS_REGISTER_B                equ 0x3F1  ; read-only
-DIGITAL_OUTPUT_REGISTER          equ 0x3F2
-TAPE_DRIVE_REGISTER              equ 0x3F3
-MAIN_STATUS_REGISTER             equ 0x3F4  ; read-only
-DATARATE_SELECT_REGISTER         equ 0x3F4  ; write-only
-DATA_FIFO                        equ 0x3F5
-DIGITAL_INPUT_REGISTER           equ 0x3F7  ; read-only
-CONFIGURATION_CONTROL_REGISTER   equ 0x3F7  ; write-only
-
-; Команды
-READ_TRACK                      equ 2  ; generates IRQ6
-SPECIFY                         equ 3  ; * set drive parameters
-SENSE_DRIVE_STATUS              equ 4
-WRITE_DATA                      equ 5  ; * write to the disk
-READ_DATA                       equ 6  ; * read from the disk
-RECALIBRATE                     equ 7  ; * seek to cylinder 0
-SENSE_INTERRUPT                 equ 8  ; * ack IRQ6, get status of last command
-WRITE_DELETED_DATA              equ 9
-READ_ID                         equ 10 ; generates IRQ6
-READ_DELETED_DATA               equ 12
-FORMAT_TRACK                    equ 13
-DUMPREG                         equ 14
-SEEK                            equ 15 ; * seek both heads to cylinder X
-VERSION                         equ 16 ; * used during initialization, once
-SCAN_EQUAL                      equ 17
-PERPENDICULAR_MODE              equ 18 ; * used during initialization, once, maybe
-CONFIGURE                       equ 19 ; * set controller parameters
-LOCK                            equ 20 ; * protect controller params from a reset
-VERIFY                          equ 22
-SCAN_LOW_OR_EQUAL               equ 25
-SCAN_HIGH_OR_EQUAL              equ 29
-
-; Статусы
-FDC_STATUS_NONE                 equ 0x0
-FDC_STATUS_SEEK                 equ 0x1
-FDC_STATUS_RW                   equ 0x2
-FDC_STATUS_SENSEI               equ 0x3
-
-fdc:
-
-; результат
-.st0            db 0        ; Статусный регистр 0
-.st1            db 0
-.st2            db 0
-.cyl            db 0
-.head_end       db 0
-.head_start     db 0
-
-; функционирование
-.motor          db 0        ; Включен ли мотор
-.motor_time     dd 0        ; Время включения мотора
-.func           db 0        ; Функция запроса на IRQ
-.ready          db 0        ; IRQ обработан
-.error          db 0        ; Ошибка исполнения
-
-; запрос
-.r_hd           db 0        ; * головка
-.r_cyl          db 0        ; * цилиндр
-.r_sec          db 0        ; * сектор
-
 ; Кеш флоппи-диска в памяти
 ; Инициализация каналов DMA для FDC
 ; ----------------------------------------------------------------------
@@ -106,6 +44,10 @@ fdc_init:
         out     $81, al         ; [23:16]
         mov     al, $02
         out     $0A, al         ; Размаскрировать DMA channel 2
+
+        ; Инициализация
+        mov     [fdc.motor], 0
+        mov     [fdc.ready], 0
         ret
 
 ; ----------------------------------------------------------------------
@@ -220,7 +162,7 @@ fdc_calibrate:
         call    fdc_write_reg
         mov     al, 0
         call    fdc_write_reg
-@@:     cmp     [fdc.ready], 0 ; Ожидать ответа IRQ
+@@:     cmp     [fdc.ready], 0      ; Ожидать ответа IRQ
         je      @b
         ret
 
@@ -238,7 +180,7 @@ fdc_reset:
         out     dx, al
 @@:     cmp     [fdc.ready], 0 ; Подождать IRQ
         je      @b
-        
+
         ; Конфигурирование
         mov     dx, CONFIGURATION_CONTROL_REGISTER
         mov     al, 0
@@ -276,6 +218,7 @@ fdc_lba2chs:
         ret
 
 ; Чтение и запись в DMA => IRQ #6
+; ----------------------------------------------------------------------
 ; bl = 0 READ; 1 WRITE
 ; ax = lba
 
@@ -329,11 +272,11 @@ fdc_prepare:
         call    fdc_lba2chs             ; Вычислить LBA
         mov     [fdc.error], 0          ; Отметить, что ошибок пока нет
         mov     eax, [irq_timer]
-        mov     [fdc.motor_time], eax        
+        mov     [fdc.motor_time], eax
         cmp     [fdc.motor], 0          ; Включить мотор, если нужно
         jne     @f
         call    fdc_reset
-@@:     call    fdc_seek        
+@@:     call    fdc_seek
 @@:     cmp     [fdc.ready], 0          ; Подождать IRQ #6
         je      @b
         ret
@@ -342,7 +285,8 @@ fdc_prepare:
 
 ; Чтение сектора (AX) в $1000 -> IRQ #6
 fdc_read:
-        
+
+        ; @todo сначала проверить в кеше
         call    fdc_prepare
         call    fdc_dma_read
         mov     bl, 0
@@ -353,7 +297,7 @@ fdc_read:
 fdc_write:
 
         call    fdc_prepare
-        call    fdc_dma_read
+        call    fdc_dma_write
         mov     bl, 1
         call    fdc_rw
         ret
@@ -370,6 +314,6 @@ fdc_irq:
 .rw:    call    fdc_get_result          ; Забрать результат при R/W
         and     al, al
         jne     .exit
-        mov     [fdc.error], byte 1     ; Ошибка чтения
+        mov     [fdc.error], byte 1     ; Ошибка чтения при al > 0
 .exit:  mov     [fdc.ready], byte 1     ; Завершено
         ret
