@@ -4,6 +4,12 @@
 
 irq_init:
 
+        ; Отключение APIC
+        mov     ecx, 0x1b
+        rdmsr
+        and     eax, 0xfffff7ff
+        wrmsr
+
         ; Выполнение запросов
         mov     ecx, 10
         xor     edx, edx
@@ -104,11 +110,11 @@ irq:
         inc     [irq_timer]
         ret
 
-.keyb:  
+.keyb:
         in      al, $60
         ret
 
-.nil:   ret        
+.nil:   ret
 
 ; Два типа общих обработчиков
 .master: IRQ_handler 0
@@ -147,8 +153,8 @@ mem_init:
 
         ; Размер памяти
         mov     ecx, 32             ; Бинарный поиск на 2^32
-        mov     esi, $00100000
-        mov     edi, $dfffffff
+        mov     esi, LOW_MEMORY 
+        mov     edi, $bfffffff      ; $c0000000 hardware
 .rept:  mov     ebx, esi            ; ebx = (esi + edi) >> 1
         add     ebx, edi
         rcr     ebx, 1
@@ -164,13 +170,13 @@ mem_init:
         ; Разметка PDBR
         mov     ecx, edi
         shr     ecx, 22             ; Кол-во 4-мб страниц
-        mov     edi, $100000        ; Очистить PDBR
+        mov     edi, LOW_MEMORY     ; Очистить PDBR
         push    edi ecx
         mov     ecx, 1024
         xor     eax, eax
         rep     stosd
         pop     ecx edi
-        mov     eax, $101003        ; Каталоги c правами R/W=1, P=1
+        mov     eax, LOW_MEMORY + $1003        ; Каталоги c правами R/W=1, P=1
 @@:     stosd
         add     eax, $1000
         loop    @b
@@ -178,23 +184,33 @@ mem_init:
         ; Разметка каталогов
         mov     ecx, [mem_size]
         shr     ecx, 12
-        mov     edi, $101000
+        mov     ecx, ecx
+        mov     ecx, $8000
+        mov     edi, LOW_MEMORY + $1000
         mov     eax, $000003
 @@:     stosd
         add     eax, $1000
         loop    @b
 
         ; Включение страничной организации
-        mov     eax, $00100000
+        mov     eax, LOW_MEMORY
         mov     cr3, eax
-        mov     [TSS.cr3], eax      ; Записать адрес PDBR
+        mov     [TSS.cr3], eax
+
+        ; Переключить на страницы
         mov     eax, cr0
-        or      eax, $80000000
-        mov     cr0, eax            ; Переключить на страницы
-        jmp     $+2
-   
+        bts     eax, 31
+        mov     cr0, eax
+
+        ; Принудительный сброс TLB
+        mov     ecx, [mem_size]
+@@:     invlpg  [ecx - 1024]
+        sub     ecx, 4096
+        jnb     @b
+
         ; Локальная память для задач ядра
-        mov     [dynamic], edi 
+        mov     [dynamic], edi
+        mov     [appsmem], START_MEM
         ret
 
 ; Перенос GDT в другое место

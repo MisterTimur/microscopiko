@@ -38,17 +38,18 @@ pm:     mov     ax, $0008
         mov     ds, ax
         mov     es, ax
         mov     ss, ax
-        mov     esp, $7c00
+        
+        mov     esp, $8000        
         call    irq_init            ; Средиректить IRQ
         call    ivt_init            ; Инициализировать IVT
         call    tss_init            ; Запустить TSS
         call    dev_init            ; Устройства
         call    gdt_init            ; Новое место GDT
         call    mem_init            ; Страничная память
+        mov     esp, HI_STACK       ; Новый стек
 
         mov     [$b8000], word $1F50
 
-        sti
         jmp     $
 
         ; Обращения к FDC
