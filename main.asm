@@ -2,7 +2,6 @@
         org     8000h
 
         include "macro.asm"
-        include "define.asm"
 
 ; Вход в защищенный режим
 ; ----------------------------------------------------------------------
@@ -32,7 +31,7 @@ GDT:    dw 0,      0,    0,     0   ; 00 NULL-дескриптор
 
         use32
 
-        include "core/core.asm"
+        include "core.asm"
 
         ; Установка сегментов данных
 pm:     mov     ax, $0008
@@ -40,13 +39,15 @@ pm:     mov     ax, $0008
         mov     es, ax
         mov     ss, ax
         mov     esp, $7c00
-        call    irq_redirect        ; Средиректить IRQ
+        call    irq_init            ; Средиректить IRQ
         call    ivt_init            ; Инициализировать IVT
         call    tss_init            ; Запустить TSS
         call    dev_init            ; Устройства
+        call    mem_init            ; Страничная память
+
+        mov     [$b8000], word $1750
 
         sti
-
         jmp     $
 
         ; Включение страниц

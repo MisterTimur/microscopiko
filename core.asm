@@ -2,12 +2,12 @@
 ; Простановка редиректов
 ; ----------------------------------------------------------------------
 
-irq_redirect:
+irq_init:
 
         ; Выполнение запросов
         mov     ecx, 10
         xor     edx, edx
-        mov     esi, irq_redirect.data
+        mov     esi, .data
 @@:     lodsw
         mov     dl, al
         mov     al, ah
@@ -26,10 +26,11 @@ irq_redirect:
         db      PIC2_DATA,    0x02
         db      PIC1_DATA,    ICW4_8086
         db      PIC2_DATA,    ICW4_8086
-        db      PIC1_DATA,    0xFF xor (IRQ_TIMER)
+        db      PIC1_DATA,    0xFF xor (IRQ_TIMER or IRQ_KEYB)
         db      PIC2_DATA,    0xFF
 
 ; Инициализация IVT
+; Для IRQ используются "обертки" - устанавливаются ссылки в .irq_X
 ; ----------------------------------------------------------------------
 
 ivt_init:
@@ -41,14 +42,12 @@ ivt_init:
 @@:     call    .make
         loop    @b
 
-        ; Установка обработчиков IRQ
-        mov     cx, 1
-        mov     esi, .irq
-@@:     movzx   edi, byte [esi]
-        inc     esi
-        lodsd
-        shl     edi, 3
-        call    .make
+        ; Установка ссылок на обработчики IRQ #n
+        mov     cx, 16
+        mov     eax, .it0
+        mov     edi, $20 shl 3
+@@:     call    .make
+        add     eax, .it1 - .it0
         loop    @b
         ret
 
@@ -59,22 +58,57 @@ ivt_init:
         add     edi, 8
         ret
 
-.irq:   IRQitem $20, irq.timer
-
 ; Ошибка вызова несуществующего прерывания. Ничегошеньки не делать.
 .null:  iretd
 
-; Важные системные прерывания
-; ----------------------------------------------------------------------
+; Обработчики IRQ #n
+.it0:   IRQ_master .irq_0
+.it1:   IRQ_master .irq_1
+        IRQ_master .irq_2
+        IRQ_master .irq_3
+        IRQ_master .irq_4
+        IRQ_master .irq_5
+        IRQ_master .irq_6
+        IRQ_master .irq_7
+        IRQ_master .irq_8
+        IRQ_master .irq_9
+        IRQ_master .irq_A
+        IRQ_master .irq_B
+        IRQ_master .irq_C
+        IRQ_master .irq_D
+        IRQ_master .irq_E
+        IRQ_master .irq_F
 
+; Ссылки на обработчики IRQ
+.irq_0: dd irq.timer
+.irq_1: dd irq.master
+.irq_2: dd irq.master
+.irq_3: dd irq.master
+.irq_4: dd irq.master
+.irq_5: dd irq.master
+.irq_6: dd irq.master
+.irq_7: dd irq.master
+.irq_8: dd irq.slave
+.irq_9: dd irq.slave
+.irq_A: dd irq.slave
+.irq_B: dd irq.slave
+.irq_C: dd irq.slave
+.irq_D: dd irq.slave
+.irq_E: dd irq.slave
+.irq_F: dd irq.slave
+
+; ----------------------------------------------------------------------
 irq:
 
-.timer: pusha
-        inc     [irq_timer]
-        mov     al, $20
-        out     $20, al
-        popa
-        iretd
+.timer: inc     [irq_timer]
+        ret
+
+.keyb:  in      al, $60
+        ret
+
+; Два типа общих обработчиков
+.master: IRQ_handler 0
+.slave:  IRQ_handler 1
 
 ; Инициализация главной TSS
 ; ----------------------------------------------------------------------
@@ -100,4 +134,16 @@ dev_init:
         out     $40, al
         mov     al, $2e
         out     $40, al
+        ret
+
+; Поиск размера памяти и установка страниц -> TSS.cr3
+; ----------------------------------------------------------------------
+
+mem_init:
+
+        brk
+
+        ; Топ памяти ядра находится тут
+        mov     [dynamic], $100000
+
         ret
