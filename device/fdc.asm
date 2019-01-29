@@ -236,7 +236,6 @@ fdc_reset:
         out     dx, al
         mov     al, $0C
         out     dx, al
-brk
 @@:     cmp     [fdc.ready], 0 ; Подождать IRQ
         je      @b
         
