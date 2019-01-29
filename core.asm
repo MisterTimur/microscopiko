@@ -81,7 +81,7 @@ ivt_init:
 
 ; Ссылки на обработчики IRQ
 .irq_0: dd irq.timer
-.irq_1: dd irq.master
+.irq_1: dd irq.keyb
 .irq_2: dd irq.master
 .irq_3: dd irq.master
 .irq_4: dd irq.master
@@ -100,10 +100,12 @@ ivt_init:
 ; ----------------------------------------------------------------------
 irq:
 
-.timer: inc     [irq_timer]
+.timer:
+        inc     [irq_timer]
         ret
 
-.keyb:  in      al, $60
+.keyb:  
+        in      al, $60
         ret
 
 ; Два типа общих обработчиков
@@ -141,9 +143,61 @@ dev_init:
 
 mem_init:
 
-        brk
+        ; Размер памяти
+        mov     ecx, 32             ; Бинарный поиск на 2^32
+        mov     esi, $00100000
+        mov     edi, $dfffffff
+.rept:  mov     ebx, esi            ; ebx = (esi + edi) >> 1
+        add     ebx, edi
+        rcr     ebx, 1
+        mov     al, [ebx]           ; Тест изменений
+        xor     [ebx], byte $55
+        cmp     [ebx], al
+        cmove   edi, ebx            ; Уменьшить верхнюю
+        cmovne  esi, ebx            ; Увеличить нижнюю
+        mov     [ebx], al
+.next:  loop    .rept
+        mov     [mem_size], edi     ; Тут будет верхняя граница
 
-        ; Топ памяти ядра находится тут
-        mov     [dynamic], $100000
+        ; Разметка PDBR
+        mov     ecx, edi
+        shr     ecx, 22             ; Кол-во 4-мб страниц
+        mov     edi, $100000        ; Очистить PDBR
+        push    edi ecx
+        mov     ecx, 1024
+        xor     eax, eax
+        rep     stosd
+        pop     ecx edi
+        mov     eax, $101003        ; Каталоги c правами R/W=1, P=1
+@@:     stosd
+        add     eax, $1000
+        loop    @b
+
+        ; Разметка каталогов
+        mov     ecx, [mem_size]
+        shr     ecx, 12
+        mov     edi, $101000
+        mov     eax, $000003
+@@:     stosd
+        add     eax, $1000
+        loop    @b
+
+        ; Включение страничной организации
+        mov     eax, $00100000
+        mov     cr3, eax
+        mov     [TSS.cr3], eax      ; Записать адрес PDBR
+        mov     eax, cr0
+        or      eax, $80000000
+        mov     cr0, eax            ; Переключить на страницы
+        jmp     $+2
+   
+        ; Локальная память для задач ядра
+        mov     [dynamic], edi 
+        ret
+
+; Перенос GDT в другое место
+; ----------------------------------------------------------------------
+
+gdt_init:
 
         ret

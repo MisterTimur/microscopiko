@@ -43,16 +43,15 @@ pm:     mov     ax, $0008
         call    ivt_init            ; Инициализировать IVT
         call    tss_init            ; Запустить TSS
         call    dev_init            ; Устройства
+        call    gdt_init            ; Новое место GDT
         call    mem_init            ; Страничная память
 
-        mov     [$b8000], word $1750
+        mov     [$b8000], word $1F50
 
         sti
         jmp     $
 
-        ; Включение страниц
         ; Обращения к FDC
-
         ; Загрузка задачи в память
         ; Мультизадачное выполнение
 
