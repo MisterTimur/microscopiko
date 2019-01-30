@@ -1,3 +1,55 @@
+; Порты
+STATUS_REGISTER_A                equ 0x3F0  ; read-only
+STATUS_REGISTER_B                equ 0x3F1  ; read-only
+DIGITAL_OUTPUT_REGISTER          equ 0x3F2
+TAPE_DRIVE_REGISTER              equ 0x3F3
+MAIN_STATUS_REGISTER             equ 0x3F4  ; read-only
+DATARATE_SELECT_REGISTER         equ 0x3F4  ; write-only
+DATA_FIFO                        equ 0x3F5
+DIGITAL_INPUT_REGISTER           equ 0x3F7  ; read-only
+CONFIGURATION_CONTROL_REGISTER   equ 0x3F7  ; write-only
+
+; Команды
+READ_TRACK                      equ 2  ; generates IRQ6
+SPECIFY                         equ 3  ; * set drive parameters
+SENSE_DRIVE_STATUS              equ 4
+WRITE_DATA                      equ 5  ; * write to the disk
+READ_DATA                       equ 6  ; * read from the disk
+RECALIBRATE                     equ 7  ; * seek to cylinder 0
+SENSE_INTERRUPT                 equ 8  ; * ack IRQ6, get status of last command
+WRITE_DELETED_DATA              equ 9
+READ_ID                         equ 10 ; generates IRQ6
+READ_DELETED_DATA               equ 12
+FORMAT_TRACK                    equ 13
+DUMPREG                         equ 14
+SEEK                            equ 15 ; * seek both heads to cylinder X
+VERSION                         equ 16 ; * used during initialization, once
+SCAN_EQUAL                      equ 17
+PERPENDICULAR_MODE              equ 18 ; * used during initialization, once, maybe
+CONFIGURE                       equ 19 ; * set controller parameters
+LOCK                            equ 20 ; * protect controller params from a reset
+VERIFY                          equ 22
+SCAN_LOW_OR_EQUAL               equ 25
+SCAN_HIGH_OR_EQUAL              equ 29
+
+; Статусы
+FDC_STATUS_NONE                 equ 0x0
+FDC_STATUS_SEEK                 equ 0x1
+FDC_STATUS_RW                   equ 0x2
+FDC_STATUS_SENSEI               equ 0x3
+
+; Чтение регистра в память
+macro FDCREAD m {
+
+    call    fdc_read_reg
+    mov     [m], al
+}
+
+macro FDCWRI m {
+
+    mov     al, m
+    call    fdc_write_reg
+}
 
 ; Кеш флоппи-диска в памяти
 ; Инициализация каналов DMA для FDC
@@ -107,7 +159,9 @@ fdc_read_reg:
 ; Включить мотор
 fdc_motor_on:
 
+        cli
         mov     [fdc.motor], 1
+        sti
         mov     eax, [irq_timer]
         mov     [fdc.motor_time], eax
         mov     dx, DIGITAL_OUTPUT_REGISTER
@@ -118,7 +172,9 @@ fdc_motor_on:
 ; Выключить мотор
 fdc_motor_off:
 
+        cli
         mov     [fdc.motor], 0
+        sti
         xor     eax, eax
         mov     dx, DIGITAL_OUTPUT_REGISTER
         out     dx, al
@@ -127,8 +183,7 @@ fdc_motor_off:
 ; Проверить IRQ-статус после SEEK, CALIBRATE, etc.
 fdc_sensei:
 
-        mov     al, SENSE_INTERRUPT ; Отправка запроса
-        call    fdc_write_reg
+        FDCWRI  SENSE_INTERRUPT     ; Отправка запроса
         mov     ah, 0xd0
         call    fdc_wait
         mov     dx, DATA_FIFO       ; Получение результата
@@ -144,24 +199,19 @@ fdc_sensei:
 ; Конфигурирование
 fdc_configure:
 
-        mov     al, SPECIFY
-        call    fdc_write_reg
-        mov     al, 0
-        call    fdc_write_reg       ; steprate_headunload
-        mov     al, 0
-        call    fdc_write_reg       ; headload_ndma
+        FDCWRI  SPECIFY
+        FDCWRI  0                   ; steprate_headunload
+        FDCWRI  0                   ; headload_ndma
         ret
 
 ; Калибрация драйва
 fdc_calibrate:
 
         call    fdc_motor_on
-        mov     [fdc.func],  byte FDC_STATUS_SENSEI
-        mov     [fdc.ready], byte 0
-        mov     al, RECALIBRATE     ; Команда, Drive = A:
-        call    fdc_write_reg
-        mov     al, 0
-        call    fdc_write_reg
+        mov     [fdc.func],  FDC_STATUS_SENSEI
+        mov     [fdc.ready], 0
+        FDCWRI  RECALIBRATE         ; Команда, Drive = A:
+        FDCWRI  0
 @@:     cmp     [fdc.ready], 0      ; Ожидать ответа IRQ
         je      @b
         ret
@@ -233,23 +283,17 @@ fdc_rw:
         je      @f
         mov     al, ah
 @@:     call    fdc_write_reg       ; 0 MFM_bit = 0x40 | (W=0x45 | R=0x46)
+
         mov     al, [fdc.r_hd]
         shl     al, 2
         call    fdc_write_reg       ; 1
-        mov     al, [fdc.r_cyl]
-        call    fdc_write_reg       ; 2
-        mov     al, [fdc.r_hd]
-        call    fdc_write_reg       ; 3
-        mov     al, [fdc.r_sec]
-        call    fdc_write_reg       ; 4
-        mov     al, 2
-        call    fdc_write_reg       ; 5 Размер сектора (2 ~> 512 bytes)
-        mov     al, 18
-        call    fdc_write_reg       ; 6 Последний сектор в цилиндре
-        mov     al, $1B
-        call    fdc_write_reg       ; 7 Длина GAP3
-        mov     al, $FF
-        call    fdc_write_reg       ; 8 Длина данных, игнорируется
+        FDCWRI  [fdc.r_cyl]
+        FDCWRI  [fdc.r_hd]
+        FDCWRI  [fdc.r_sec]
+        FDCWRI  2                   ; 5 Размер сектора (2 ~> 512 bytes)
+        FDCWRI  18                  ; 6 Последний сектор в цилиндре
+        FDCWRI  $1B                 ; 7 Длина GAP3
+        FDCWRI  $FF                 ; 8 Длина данных, игнорируется
         ret
 
 ; Поиск дорожки => IRQ #6
@@ -257,13 +301,11 @@ fdc_seek:
 
         mov     [fdc.ready], 0
         mov     [fdc.func],  FDC_STATUS_SEEK
-        mov     al, SEEK
-        call    fdc_write_reg           ; Команда
+        FDCWRI  SEEK                    ; Команда
         mov     al, [fdc.r_hd]
         shl     al, 2
         call    fdc_write_reg           ; head<<2
-        mov     al, [fdc.r_cyl]
-        call    fdc_write_reg           ; Цилиндр
+        FDCWRI  [fdc.r_cyl]             ; Цилиндр
         ret
 
 ; Подготовить диск для чтения/записи (AX = LBA)
