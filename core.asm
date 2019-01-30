@@ -205,6 +205,21 @@ mem_init:
         add     eax, $1000
         loop    @b
 
+        ; Добавление региона UMMP (битовая маска занятости)
+        mov     [ummp], edi
+        mov     ecx, [mem_size]
+        shr     ecx, (12 + 3)           ; 1 байт описывает 2^15 памяти
+        push    edi ecx
+        shr     ecx, 2
+        xor     eax, eax
+        rep     stosd
+        pop     ecx edi
+        add     edi, ecx
+
+        ; Локальная память для задач ядра
+        mov     [appsmem], START_MEM
+        mov     [dynamic], edi
+
         ; Включение страничной организации
         mov     eax, LOW_MEMORY
         mov     cr3, eax
@@ -215,9 +230,6 @@ mem_init:
         bts     eax, 31
         mov     cr0, eax
 
-        ; Локальная память для задач ядра
-        mov     [dynamic], edi
-        mov     [appsmem], START_MEM
         ret
 
 ; Перенос GDT в другое место

@@ -40,13 +40,13 @@ pm:     mov     ax, $0008
         mov     ds, ax
         mov     es, ax
         mov     ss, ax
-        
-        mov     esp, $8000        
+
+        mov     esp, $8000
         call    irq_init            ; Средиректить IRQ
-        call    ivt_init            ; Инициализировать IVT
-        call    tss_init            ; Запустить TSS
-        call    dev_init            ; Устройства
-        call    mem_init            ; Страничная память
+        call    ivt_init            ; Interrupt Vector Table
+        call    tss_init            ; Task Segment Stage
+        call    dev_init            ; Таймер и устройства
+        call    mem_init            ; Управление памятью
         call    gdt_init            ; Новое место GDT
         call    fdc_init            ; Создать кеш fd-диска
         mov     esp, HI_STACK       ; Новый стек
@@ -54,9 +54,14 @@ pm:     mov     ax, $0008
         mov     [$b8000], word $1F33
 
         sti
-        
-        ;mov     ax, 19
-        ;call    fdc_read
+
+        mov     ax, 19
+        call    fdc_read
+        FDCREADY
+
+        ; искать файлы
+        ; создать место в памяти для них
+        ; запустить многозадачность
 
         jmp     $
 

@@ -51,6 +51,13 @@ macro FDCWRI m {
     call    fdc_write_reg
 }
 
+; Ожидать готовность IRQ
+macro FDCREADY {
+
+@@:     cmp     [fdc.ready], 0
+        je      @b
+}
+
 ; Кеш флоппи-диска в памяти
 ; Инициализация каналов DMA для FDC
 ; ----------------------------------------------------------------------
@@ -73,29 +80,29 @@ fdc_init:
 
         ; Установка DMA
         mov     al, $06
-        out     $0A, al         ; Маскирование DMA channel 2 и 0
+        out     $0A, al ; Маскирование DMA channel 2 и 0
 
         ; Адрес
         mov     al, $FF
-        out     $0C, al         ; Сброс master flip-flop
+        out     $0C, al ; Сброс master flip-flop
         mov     al, $00
-        out     $04, al         ; [7:0]
+        out     $04, al ; [7:0]
         mov     al, $10
-        out     $04, al         ; [15:8]
+        out     $04, al ; [15:8]
 
         ; Размер
         mov     al, $FF
-        out     $0C, al         ; Сброс master flip-flop
+        out     $0C, al ; Сброс master flip-flop
         mov     al, $FF
-        out     $05, al         ; [7:0]
+        out     $05, al ; [7:0]
         mov     al, $3F
-        out     $05, al         ; [15:8]
+        out     $05, al ; [15:8]
 
         ; Адрес
         mov     al, $00
-        out     $81, al         ; [23:16]
+        out     $81, al ; [23:16]
         mov     al, $02
-        out     $0A, al         ; Размаскрировать DMA channel 2
+        out     $0A, al ; Размаскировать DMA channel 2
 
         ; Инициализация
         mov     [fdc.motor], 0
@@ -107,12 +114,12 @@ fdc_init:
 ; Подготовить диск на чтение
 fdc_dma_read:
 
-        mov     al, $06         ; mask DMA channel 2 and 0 (assuming 0 is already masked)
+        mov     al, $06 ; mask DMA channel 2 and 0 (assuming 0 is already masked)
         out     $0A, al
         mov     al, $56
-        out     $0B, al         ; 01010110 single transfer, address increment, autoinit, read, channel2)
+        out     $0B, al ; 01010110 single transfer, address increment, autoinit, read, channel2)
         mov     al, $02
-        out     $0A, al         ; unmask DMA channel 2
+        out     $0A, al ; unmask DMA channel 2
         ret
 
 ; Подготовить диск на запись
@@ -121,12 +128,12 @@ fdc_dma_write:
         mov     al, $06
         out     $0A, al
         mov     al, $5A
-        out     $0B, al         ; 01011010 single transfer, address increment, autoinit, write, channel2
+        out     $0B, al ; 01011010 single transfer, address increment, autoinit, write, channel2
         mov     al, $02
         out     $0A, al
         ret
 
-; Ожидать завершения (параметр ah)
+; Ожидать завершения (проверочный параметр AH)
 fdc_wait:
 
         push    eax
@@ -142,29 +149,29 @@ fdc_wait:
 fdc_write_reg:
 
         mov     ah, $80
-        call    fdc_wait
+        call    fdc_wait            ; Ожидать OK
         mov     dx, DATA_FIFO
-        out     dx, al
+        out     dx, al              ; Записать AL в FIFO
         ret
 
 ; Чтение данных (al) из FIFO
 fdc_read_reg:
 
         mov     ah, $c0
-        call    fdc_wait
+        call    fdc_wait            ; Ожидать OK
         mov     dx, DATA_FIFO
-        in      al, dx
+        in      al, dx              ; Прочесть AL из FIFO
         ret
 
 ; Включить мотор
 fdc_motor_on:
 
         cli
-        mov     [fdc.motor], 1
+        mov     [fdc.motor], 1              ; Включение
         sti
         mov     eax, [irq_timer]
-        mov     [fdc.motor_time], eax
-        mov     dx, DIGITAL_OUTPUT_REGISTER
+        mov     [fdc.motor_time], eax       ; Запись таймера
+        mov     dx, DIGITAL_OUTPUT_REGISTER ; Регистр DOR = $1C (On)
         mov     al, 0x1C
         out     dx, al
         ret
@@ -176,7 +183,7 @@ fdc_motor_off:
         mov     [fdc.motor], 0
         sti
         xor     eax, eax
-        mov     dx, DIGITAL_OUTPUT_REGISTER
+        mov     dx, DIGITAL_OUTPUT_REGISTER ; Отключить
         out     dx, al
         ret
 
@@ -212,8 +219,7 @@ fdc_calibrate:
         mov     [fdc.ready], 0
         FDCWRI  RECALIBRATE         ; Команда, Drive = A:
         FDCWRI  0
-@@:     cmp     [fdc.ready], 0      ; Ожидать ответа IRQ
-        je      @b
+        FDCREADY                    ; Ожидать ответа IRQ
         ret
 
 ; Сбросить контроллер перед работой с диском
@@ -228,8 +234,7 @@ fdc_reset:
         out     dx, al
         mov     al, $0C
         out     dx, al
-@@:     cmp     [fdc.ready], 0 ; Подождать IRQ
-        je      @b
+        FDCREADY               ; Ожидать ответа IRQ
 
         ; Конфигурирование
         mov     dx, CONFIGURATION_CONTROL_REGISTER
@@ -277,13 +282,11 @@ fdc_rw:
 
         mov     [fdc.ready], 0
         mov     [fdc.func],  FDC_STATUS_RW
-
         mov     ax, $4546
         and     bl, bl
         je      @f
         mov     al, ah
 @@:     call    fdc_write_reg       ; 0 MFM_bit = 0x40 | (W=0x45 | R=0x46)
-
         mov     al, [fdc.r_hd]
         shl     al, 2
         call    fdc_write_reg       ; 1
@@ -319,8 +322,60 @@ fdc_prepare:
         jne     @f
         call    fdc_reset
 @@:     call    fdc_seek
-@@:     cmp     [fdc.ready], 0          ; Подождать IRQ #6
-        je      @b
+        FDCREADY
+        ret
+
+; На вход: ax - сектор, ebx - адрес маски, cl - смещение бита (0-7)
+fdc_cache_calc:
+
+        push    eax
+        xchg    eax, ecx
+        and     ecx, $0FFF
+        mov     ebx, ecx
+        shr     ebx, 3
+        and     cl, $07
+        add     ebx, [fdcache_mask]
+        pop     eax
+        ret
+
+; Проверка на наличие в кеше
+; Если ZF=1, то в кеше нет, иначе есть
+fdc_cache_test:
+
+        call    fdc_cache_calc
+        mov     bx, [ebx]
+        shr     bx, cl
+        and     bl, 1    
+        ret
+
+; Загрузка сектора (AX) в кеш в $1000
+fdc_cache_save:
+
+        push    eax
+        mov     ax, [fdc.lba]
+        call    fdc_cache_calc
+        mov     dl, 1
+        shl     dl, cl
+        or      [ebx], dl           ; Отметить, что страница в кеше
+        shl     eax, 9              ; 1 сектор = 512 байт
+        add     eax, [fdcache_data] ; Позиция записи
+        xchg    eax, edi
+        mov     esi, $1000          ; Откуда читать
+        mov     ecx, 512 shr 2
+        rep     movsd               ; Запись в кеш
+        pop     eax
+        ret
+
+; Загрузка сектора (AX) из кеша в $1000
+fdc_cache_load:
+
+        mov     ax, [fdc.lba]
+        shl     eax, 9
+        add     eax, [fdcache_data]
+        xchg    eax, esi
+        mov     edi, $1000          ; Откуда читать
+        mov     ecx, 512 shr 2
+        rep     movsd               ; Запись из кеша
         ret
 
 ; ----------------------------------------------------------------------
@@ -328,8 +383,12 @@ fdc_prepare:
 ; Чтение сектора (AX) в $1000 -> IRQ #6
 fdc_read:
 
-        ; @todo сначала проверить в кеше
-        call    fdc_prepare
+        mov     [fdc.lba], ax       ; Запрошенный LBA
+        call    fdc_cache_test      ; Проверка наличия в кеше
+        jz      @f
+        call    fdc_cache_load      ; Загрузка из кеша (если есть)
+        ret
+@@:     call    fdc_prepare
         call    fdc_dma_read
         mov     bl, 0
         call    fdc_rw
@@ -338,10 +397,12 @@ fdc_read:
 ; Запись сектора (AX) из $1000 -> IRQ #6
 fdc_write:
 
+        mov     [fdc.lba], ax
         call    fdc_prepare
         call    fdc_dma_write
         mov     bl, 1
         call    fdc_rw
+        call    fdc_cache_save
         ret
 
 ; Обработчик прерываний
@@ -354,6 +415,7 @@ fdc_irq:
         call    fdc_sensei              ; Выполнить считывание рез-та
         jmp     .exit
 .rw:    call    fdc_get_result          ; Забрать результат при R/W
+        call    fdc_cache_save          ; Сохранение данных в кеш
         and     al, al
         jne     .exit
         mov     [fdc.error], byte 1     ; Ошибка чтения при al > 0
