@@ -32,8 +32,10 @@ GDT:    dw 0,      0,    0,     0   ; 00 NULL-дескриптор
         use32
 
         include "core.asm"
+
         include "device/fdc.asm"
         include "device/ata.asm"
+        include "device/ps2.asm"
 
         ; Установка сегментов данных
 pm:     mov     ax, $0008
@@ -45,28 +47,16 @@ pm:     mov     ax, $0008
         call    irq_init            ; Средиректить IRQ
         call    ivt_init            ; Interrupt Vector Table
         call    tss_init            ; Task Segment Stage
-        call    dev_init            ; Таймер и устройства
+        call    ps2_init            ; Инициализировать PS2
+        call    tik_init            ; Таймер
         call    mem_init            ; Управление памятью
         call    gdt_init            ; Новое место GDT
         call    fdc_init            ; Создать кеш fd-диска
+        ; api_init
         mov     esp, HI_STACK       ; Новый стек
 
-        mov     [$b8000], word $1F33
-
         sti
-
-        mov     ax, 19
-        call    fdc_read
-        FDCREADY
-
-        ; искать файлы
-        ; создать место в памяти для них
-        ; запустить многозадачность
-
         jmp     $
-
-        ; Загрузка задачи в память
-        ; Мультизадачное выполнение
 
 ; ----------------------------------------------------------------------
 

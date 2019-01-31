@@ -234,7 +234,7 @@ fdc_reset:
         out     dx, al
         mov     al, $0C
         out     dx, al
-        FDCREADY               ; Ожидать ответа IRQ
+                FDCREADY
 
         ; Конфигурирование
         mov     dx, CONFIGURATION_CONTROL_REGISTER
@@ -322,7 +322,7 @@ fdc_prepare:
         jne     @f
         call    fdc_reset
 @@:     call    fdc_seek
-        FDCREADY
+                FDCREADY
         ret
 
 ; На вход: ax - сектор, ebx - адрес маски, cl - смещение бита (0-7)
@@ -373,9 +373,9 @@ fdc_cache_load:
         shl     eax, 9
         add     eax, [fdcache_data]
         xchg    eax, esi
-        mov     edi, $1000          ; Откуда читать
+        mov     edi, $1000          ; Куда писать
         mov     ecx, 512 shr 2
-        rep     movsd               ; Запись из кеша
+        rep     movsd               ; Чтение из кеша
         ret
 
 ; ----------------------------------------------------------------------
