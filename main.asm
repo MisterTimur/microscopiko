@@ -47,7 +47,7 @@ pm:     mov     ax, $0008
         call    irq_init            ; Средиректить IRQ
         call    ivt_init            ; Interrupt Vector Table
         call    tss_init            ; Task Segment Stage
-        call    ps2_init            ; Инициализировать PS2
+        call    ps2_init            ; PS2-мышь
         call    tik_init            ; Таймер
         call    mem_init            ; Управление памятью
         call    gdt_init            ; Новое место GDT

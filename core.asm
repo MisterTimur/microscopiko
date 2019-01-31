@@ -32,8 +32,8 @@ irq_init:
         db      PIC2_DATA,    0x02
         db      PIC1_DATA,    ICW4_8086
         db      PIC2_DATA,    ICW4_8086
-        db      PIC1_DATA,    0xFF xor (IRQ_TIMER or IRQ_KEYB or IRQ_FDC)
-        db      PIC2_DATA,    0xFF
+        db      PIC1_DATA,    0xFF xor (IRQ_TIMER or IRQ_KEYB or IRQ_FDC or IRQ_CASCADE)
+        db      PIC2_DATA,    0xFF xor (IRQ_PS2)
 
 ; Инициализация IVT
 ; Для IRQ используются "обертки" - устанавливаются ссылки в .irq_X
@@ -98,35 +98,35 @@ ivt_init:
 .irq_9: dd irq.nil
 .irq_A: dd irq.nil
 .irq_B: dd irq.nil
-.irq_C: dd irq.nil
+.irq_C: dd irq.ps2
 .irq_D: dd irq.nil
 .irq_E: dd irq.nil
 .irq_F: dd irq.nil
 
-; ----------------------------------------------------------------------
 irq:
 
-.timer:
-        inc     [irq_timer]
-
-        ; Мотор включен? 
-        cmp     [fdc.motor], 0
-        je      .ex1
-
-        ; Если > 5с крутится, выключить
-        mov     eax, [irq_timer]
-        sub     eax, [fdc.motor_time]
-        cmp     eax, 500
-        jb      .ex1
-        call    fdc_motor_off        
-.ex1:   ret
-
+; Таймер
 ; ----------------------------------------------------------------------
 
+.timer:
+
+        inc     [irq_timer]
+        call    fdc_timeout
+        ret
+        
+; Клавиатура
+; ----------------------------------------------------------------------
 .keyb:
         in      al, $60
         ret
 
+; Мышь
+; ----------------------------------------------------------------------
+
+.ps2:   call    ps2_handler
+        ret
+
+; ----------------------------------------------------------------------
 .nil:   ret
 
 ; Два типа общих обработчиков

@@ -345,7 +345,7 @@ fdc_cache_test:
         call    fdc_cache_calc
         mov     bx, [ebx]
         shr     bx, cl
-        and     bl, 1    
+        and     bl, 1
         ret
 
 ; Загрузка сектора (AX) в кеш в $1000
@@ -421,3 +421,17 @@ fdc_irq:
         mov     [fdc.error], byte 1     ; Ошибка чтения при al > 0
 .exit:  mov     [fdc.ready], byte 1     ; Завершено
         ret
+
+; Вычисление таймаута и выключение FDC из прерывания IRQ #0
+; ----------------------------------------------------------------------
+
+fdc_timeout:
+
+        cmp     [fdc.motor], 0          ; Мотор включен?
+        je      @f
+        mov     eax, [irq_timer]        ; Если > 5с крутится, выключить
+        sub     eax, [fdc.motor_time]
+        cmp     eax, 500
+        jb      @f
+        call    fdc_motor_off
+@@:     ret

@@ -33,7 +33,7 @@ IRQ_CASCADE      equ 0x04
 IRQ_FDC          equ 0x40
 
 ; PIC2
-IRQ_PS2MOUSE     equ 0x10
+IRQ_PS2          equ 0x10
 
 ; ----------------------------------------------------------------------
 

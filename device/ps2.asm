@@ -6,14 +6,15 @@ ps2_init:
         call    kb_cmd
         call    kb_read
         mov     ah, $20
+        call    kb_cmd
         call    kb_read
         push    ax
         mov     ah, $60
         call    kb_cmd
         pop     ax
         or      al, 3
-        call    kb_write        
-        mov     ah, $D4         ; Отослать команду для PS/2 разрешение
+        call    kb_write
+        mov     ah, $D4
         call    kb_cmd
         mov     al, $F4
         call    kb_write
@@ -79,7 +80,32 @@ kb_write:
 kb_read:
 
         call    kb_wait_not
-@@:     mov     ecx, 65536
-        loop    @b
+        mov     ecx, 65536
+@@:     loop    @b
         in      al, $60
         ret
+
+; Принять данные из порта
+; ----------------------------------------------------------------------
+
+ps2_handler:
+
+        mov     ah, $AD
+        call    kb_cmd      ; Блокировка клавиатуры
+        call    kb_read
+        mov     [ps2.cmd], al
+        call    kb_read
+        mov     [ps2.dat_x], al
+        call    kb_read
+        mov     [ps2.dat_y], al
+        mov     ah, $AE
+        call    kb_cmd      ; Разблокировка клавиатуры
+
+        ; Расширение знака
+        test    [ps2.cmd], $10
+        je      @f
+        or      [ps2.dat_x], $80
+@@:     test    [ps2.cmd], $20   
+        je      @f
+        or      [ps2.dat_y], $80
+@@:     ret
