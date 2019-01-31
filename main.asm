@@ -52,14 +52,16 @@ pm:     mov     ax, $0008
         call    mem_init            ; Управление памятью
         call    gdt_init            ; Новое место GDT
         call    fdc_init            ; Создать кеш fd-диска
+        ; ata_init
         ; api_init
         mov     esp, HI_STACK       ; Новый стек
 
-brk
-        ; Тесты
+        ; Тест
         mov     [ata.base], $1F0
         mov     [ata.slave], 0
-        call    ata_detect_devtype
+
+        ;mov     eax, 0
+        ;call    ata_pio_read    
 
         sti
         jmp     $
