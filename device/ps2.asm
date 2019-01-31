@@ -24,6 +24,7 @@ ps2_init:
 ; Ожидание ответа с порта $64, параметр AH - маска
 ; Если AL=0, все в порядке, иначе ошибка
 ; ----------------------------------------------------------------------
+
 kb_wait:
 
         mov     ecx, 65536
@@ -91,7 +92,7 @@ kb_read:
 ps2_handler:
 
         mov     ah, $AD
-        call    kb_cmd      ; Блокировка клавиатуры
+        call    kb_cmd          ; Блокировка клавиатуры
         call    kb_read
         mov     [ps2.cmd], al
         call    kb_read
@@ -99,10 +100,8 @@ ps2_handler:
         call    kb_read
         mov     [ps2.dat_y], al
         mov     ah, $AE
-        call    kb_cmd      ; Разблокировка клавиатуры
-
-        ; Расширение знака
-        test    [ps2.cmd], $10
+        call    kb_cmd          ; Разблокировка клавиатуры
+        test    [ps2.cmd], $10  ; Расширение знака
         je      @f
         or      [ps2.dat_x], $80
 @@:     test    [ps2.cmd], $20   

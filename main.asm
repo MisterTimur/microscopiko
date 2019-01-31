@@ -26,7 +26,7 @@ IDTR:   dw 256*8 - 1                ; Лимит GDT (размер - 1)
 GDT:    dw 0,      0,    0,     0   ; 00 NULL-дескриптор
         dw 0FFFFh, 0, 9200h, 00CFh  ; 08 32-битный дескриптор данных
         dw 0FFFFh, 0, 9A00h, 00CFh  ; 10 32-bit код
-        dw 103,  TSS, 8900h, 0040h  ; 18 Свободный TSS
+        dw 103,  tss, 8900h, 0040h  ; 18 Свободный TSS
 ; ----------------------------------------------------------------------
 
         use32
@@ -54,6 +54,12 @@ pm:     mov     ax, $0008
         call    fdc_init            ; Создать кеш fd-диска
         ; api_init
         mov     esp, HI_STACK       ; Новый стек
+
+brk
+        ; Тесты
+        mov     [ata.base], $1F0
+        mov     [ata.slave], 0
+        call    ata_detect_devtype
 
         sti
         jmp     $

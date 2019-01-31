@@ -138,7 +138,7 @@ irq:
 
 tss_init:
 
-        mov     [TSS.iobp], word 104
+        mov     [tss.iobp], word 104
         mov     ax, 18h
         ltr     ax
         ret
@@ -223,7 +223,7 @@ mem_init:
         ; Включение страничной организации
         mov     eax, LOW_MEMORY
         mov     cr3, eax
-        mov     [TSS.cr3], eax
+        mov     [tss.cr3], eax
 
         ; Переключить на страницы
         mov     eax, cr0
