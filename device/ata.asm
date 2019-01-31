@@ -30,6 +30,75 @@ macro ata_iowait {
     end repeat
 }
 
+; Инициализация 4 типов устройств
+; ----------------------------------------------------------------------
+ata_init:
+
+        mov     esi, .drives
+        mov     edi, ata.types
+        mov     ecx, 4
+.rept:  push    ecx
+        lodsw
+        mov     [ata.base], ax
+        lodsw
+        mov     [ata.slave], al
+        call    ata_detect_devtype
+        stosb
+        and     al, al
+        je      .next
+
+        ; Если AL != Unknown
+        push    edi
+        call    ata_drive_select
+brk
+        ; Отправка команды IDENTIFY
+        mov     bx, [ata.base]
+        lea     dx, [bx + ATA_REG_COUNT]
+        xor     eax, eax
+        repeat 4            ; ATA_REG_COUNT
+        out     dx, al      ; ATA_REG_LBA_LO
+        inc     dx          ; ATA_REG_LBA_MID
+        end repeat          ; ATA_REG_LBA_HI
+        inc     dx
+        mov     al, 0xEC
+        out     dx, al      ; ATA_REG_CMD
+        in      al, dx      ; Если тут AL = 0, это ошибка
+        and     al, al
+        je      .next
+
+        mov     ecx, 32768  ; Ожидание готовности
+@@:     in      al, dx
+        and     al, $80
+        loopnz  @b
+
+        ; Выделить новую память
+        mov     edi, [dynamic]          ; верх
+        mov     ebx, [.idptr]
+        mov     [ebx], edi              ; запись указателя
+        lea     eax, [edi + 512]
+        mov     [dynamic], eax          ; новая позиция верха
+
+        ; Запись данных в память
+        mov     dx, [ata.base]
+        mov     ecx, 256
+        rep     insw
+        pop     edi
+
+        ; Следующий identify
+.next:  add     [.idptr], 4
+        pop     ecx
+        dec     ecx
+        jne    .rept
+        ret
+
+.drives:
+
+        dw      $1F0, 0         ; Pri/Master
+        dw      $1F0, 1         ; Pri/Slave
+        dw      $170, 0         ; Sec/Master
+        dw      $170, 1         ; Sec/Slave
+.idptr  dd      ata.identify
+
 ; Ответ: ZF=0 ошибка, ZF=1 ошибок нет
 ; ----------------------------------------------------------------------
 
@@ -60,13 +129,13 @@ ata_drive_select:
         mov     al, [ata.slave]
         shl     al, 4
         or      al, $A0 or $40  ; 0x40=Set LBA Bit
-        lea     dx, [bx + ATA_REG_DEVSEL + $200]
+        lea     dx, [bx + ATA_REG_DEVSEL]
         out     dx, al
+        or      dx, $200
         ata_iowait
         ret
 
-; Определение типа устройства на шине
-; dx - тип устройства
+; Определение типа устройства на шине => AL
 ; ----------------------------------------------------------------------
 
 ata_detect_devtype:
@@ -100,7 +169,8 @@ ata_detect_devtype:
         cmp     ax, 0x3CC3
         je      @f
         mov     dx, DISK_DEV_UNKNOWN
-@@:     ret
+@@:     movzx   eax, dx
+        ret
 
 
 ; Ждать ответа от диска
@@ -159,7 +229,7 @@ ata_prepare_lba:
         mov     al, byte [ata.count]
         out     dx, al
         inc     dx
-        mov     al, byte [ata.lba]
+        mov     al, byte [ata.lba + 0]
         out     dx, al  ; ATA_REG_LBA_LO  (lba >> 8)
         inc     dx
         mov     al, byte [ata.lba + 1]
