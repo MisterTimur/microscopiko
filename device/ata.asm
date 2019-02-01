@@ -34,9 +34,9 @@ macro ata_iowait {
 ; ----------------------------------------------------------------------
 ata_init:
 
-        mov     esi, .drives
-        mov     edi, ata.types
-        mov     ecx, 4
+        mov     esi, .drives    ; Перечислить base | slave
+        mov     edi, ata.types  ; Тут будут типы
+        mov     ecx, 4          ; Определить типы
 .rept:  push    ecx
         lodsw
         mov     [ata.base], ax
@@ -45,47 +45,36 @@ ata_init:
         call    ata_detect_devtype
         stosb
         and     al, al
-        je      .next
-
-        ; Если AL != Unknown
+        je      .next           ; Если AL != Unknown
         push    edi
         call    ata_drive_select
-brk
-        ; Отправка команды IDENTIFY
+        xor     eax, eax
         mov     bx, [ata.base]
         lea     dx, [bx + ATA_REG_COUNT]
-        xor     eax, eax
-        repeat 4            ; ATA_REG_COUNT
-        out     dx, al      ; ATA_REG_LBA_LO
-        inc     dx          ; ATA_REG_LBA_MID
-        end repeat          ; ATA_REG_LBA_HI
+        repeat 4                ; ATA_REG_COUNT
+        out     dx, al          ; ATA_REG_LBA_LO
+        inc     dx              ; ATA_REG_LBA_MID
+        end repeat              ; ATA_REG_LBA_HI
         inc     dx
-        mov     al, 0xEC
-        out     dx, al      ; ATA_REG_CMD
-        in      al, dx      ; Если тут AL = 0, это ошибка
+        mov     al, 0xEC        ; Команда IDENTIFY
+        out     dx, al          ; ATA_REG_CMD
+        in      al, dx
         and     al, al
-        je      .next
-
-        mov     ecx, 32768  ; Ожидание готовности
+        je      .next           ; При ошибке перейти на .next
+        mov     ecx, 32768      ; Ожидание BSY
 @@:     in      al, dx
         and     al, $80
         loopnz  @b
-
-        ; Выделить новую память
-        mov     edi, [dynamic]          ; верх
+        mov     edi, [dynamic]  ; Выделить новую память
         mov     ebx, [.idptr]
-        mov     [ebx], edi              ; запись указателя
+        mov     [ebx], edi      ; Запись указателя
         lea     eax, [edi + 512]
-        mov     [dynamic], eax          ; новая позиция верха
-
-        ; Запись данных в память
-        mov     dx, [ata.base]
+        mov     [dynamic], eax  ; новая позиция верха
+        mov     dx, [ata.base]  ; Запись данных в память
         mov     ecx, 256
         rep     insw
         pop     edi
-
-        ; Следующий identify
-.next:  add     [.idptr], 4
+.next:  add     [.idptr], 4     ; Следующий identify
         pop     ecx
         dec     ecx
         jne    .rept
@@ -107,15 +96,15 @@ ata_soft_reset:
         mov     al, 4
         mov     bx, [ata.base]
         lea     dx, [bx + ATA_REG_DEVSEL + $200]
-        out     dx, al          ; do a "software reset" on the bus
+        out     dx, al          ; Выполнить "software reset" на шине
         mov     al, 0
-        out     dx, al          ; reset the bus to normal operation
+        out     dx, al          ; Сбросить шину к normal operation
         ata_iowait
         mov     ecx, 4096
 @@:     in      al, dx
         and     al, $c0
-        cmp     al, $40         ; если BSY=0, RDY=1 - все ОК
-        loopnz  @b              ; ждать, пока не будет $40
+        cmp     al, $40         ; Если BSY=0, RDY=1 - все ОК
+        loopnz  @b              ; Ждать, пока не будет ровно $40
 @@:     ret
 
 ; Выбор устройства для работы
@@ -172,7 +161,6 @@ ata_detect_devtype:
 @@:     movzx   eax, dx
         ret
 
-
 ; Ждать ответа от диска
 ; ZF=1 Успех, ZF=0 Ошибка
 ; ----------------------------------------------------------------------
@@ -184,7 +172,7 @@ ata_wait_response:
         mov     ecx, 32768
 @@:     in      al, dx
         and     al, $EF
-        cmp     al, $48     ; DRQ=1, ERR=0, CORR=0, IDX=0, RDY=1, DF=0
+        cmp     al, $48     ; BSY=0, DRQ=1, ERR=0, CORR=0, IDX=0, RDY=1, DF=0
         loopnz  @b
         ret
 
@@ -240,12 +228,9 @@ ata_prepare_lba:
         inc     dx
         pop     ax
 
-        ; Отправка команды
-        lea     dx, [bx + ATA_REG_CMD]
+        lea     dx, [bx + ATA_REG_CMD]  ; Отправка команды
         out     dx, al
-
-        ; Ждать ответа
-        call    ata_wait_response
+        call    ata_wait_response       ; Ждать ответа
         je      @f
         mov     [ata.error], al
 @@:     ret
@@ -277,7 +262,7 @@ ata_pio_write:
         mov     [ata.error], 0
         mov     [ata.lba], eax
         mov     [ata.count], 1
-        mov     al, $24
+        mov     al, $34
         call    ata_prepare_lba
         jnz     @f
         mov     dx, [ata.base]

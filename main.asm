@@ -32,10 +32,12 @@ GDT:    dw 0,      0,    0,     0   ; 00 NULL-дескриптор
         use32
 
         include "core.asm"
+        include "fs.asm"
 
         include "device/fdc.asm"
         include "device/ata.asm"
         include "device/ps2.asm"
+        include "device/vga.asm"
 
         ; Установка сегментов данных
 pm:     mov     ax, $0008
@@ -53,8 +55,10 @@ pm:     mov     ax, $0008
         call    gdt_init            ; Новое место GDT
         call    fdc_init            ; Создать кеш fd-диска
         call    ata_init            ; Инициализировать hd
-        ; api_init
         ; pci_init
+        ; vga_init
+        ; api_init
+        ; fat_init ; поиск fs
         mov     esp, HI_STACK       ; Новый стек
 
         ; Тест
