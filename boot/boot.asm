@@ -136,3 +136,6 @@ ReadSector:
 
         ; Сигнатура
         dw 0xAA55
+
+
+        ; Test Record From Timur
